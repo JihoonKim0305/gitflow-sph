@@ -62,7 +62,7 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 | CI 설정 | `ci` |
 
 - `scope` 는 변경된 디렉터리/모듈 이름이 명확할 때만 추가. 애매하면 생략.
-- subject 는 명령형 현재시제, 영어/한국어 모두 허용. 50자 내외 권장, 최대 72자.
+- subject 는 명령형 현재시제, 한국어 권장(영어도 허용). 50자 내외 권장, 최대 72자.
 - body 는 한 줄 빈 줄로 분리. 2~5줄 정도로 "왜" 를 설명.
 - 사용자 메시지 힌트(`$ARGUMENTS`)가 있으면 그것을 우선 반영해서 subject/body를 작성.
 
