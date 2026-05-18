@@ -125,13 +125,22 @@ git tag -d "$VERSION" 2>/dev/null || true
 
 ### 4) push (성공 시)
 
+`git flow release finish` 종료 시점에는 일반적으로 `develop` 브랜치에 위치하게 된다. 다음 순서로 push 한다:
+
 ```bash
-git checkout main
-git push origin main
 git checkout develop
 git push origin develop
+git checkout main
+git push origin main
 git push origin "v$VERSION"
+git checkout develop
 ```
+
+순서 고정:
+1. **develop push 우선** — release finish 직후 위치한 브랜치이므로 가장 먼저 원격에 반영.
+2. main checkout 후 main push — 릴리즈 머지 결과 반영.
+3. 태그(`v<VERSION>`) push — main 푸시와 분리하여 명시적으로 처리.
+4. 마지막에 develop 으로 돌아와 작업 환경을 복귀.
 
 각 push 가 거부되면(non-ff 등) 절대 강제 푸시하지 말고 사용자에게 보고 후 중단.
 

@@ -57,6 +57,8 @@ gh auth status     # 인증 확인
 | `/feature-start <id-or-name>` | develop 최신화 후 `git flow feature start` |
 | `/feature-commit [메시지 힌트]` | Conventional Commits 형식 커밋 (Feature ID + Co-Authored-By 자동 포함) |
 | `/feature-finish` | squash rebase → push → `gh pr create` |
+| `/feature-cleanup [id]` | PR 머지 확인 후 로컬/원격 feature 브랜치 안전 삭제 (id 미지정 시 현재 브랜치 또는 후보 선택) |
+| `/feature-cleanup-all` | 내가 author 인 머지된 feature 브랜치를 일괄 조회 → 사용자 확인 1회 → 일괄 삭제 |
 | `/release-start [--major\|--minor\|--patch]` | SemVer 산정 → `git flow release start` → package.json/CHANGELOG 갱신 |
 | `/release-finish` | release → main/develop 머지 + 태그 + push |
 
@@ -154,6 +156,25 @@ flowchart TD
 ```
 
 원격에 같은 브랜치가 이미 있는 경우 `/feature-finish` 는 자동으로 force push 하지 않고 **사용자에게 어떻게 진행할지 묻고 중단**합니다.
+
+```bash
+# 4. PR 이 머지된 뒤 정리
+/feature-cleanup 11754215659
+#   → PR #<num> merged 여부 확인 (gh pr list)
+#   → develop pull --ff-only
+#   → git branch -d feature/11754215659      (미머지 커밋 있으면 중단)
+#   → git push origin --delete feature/11754215659  (이미 사라졌으면 스킵)
+#   → git fetch --prune origin
+
+# 또는 인자 없이 호출하면:
+#   - 현재 브랜치가 feature/<x> 면 그것을 대상으로
+#   - 아니면 "내가 author 인 머지된 PR" 후보를 보여주고 선택
+
+# 여러 개를 한 번에:
+/feature-cleanup-all
+#   → 내가 author 인 merged PR ∩ 로컬 feature/* 교집합 조회
+#   → 사용자 확인 1회 → 일괄 삭제 (각 브랜치 독립 처리)
+```
 
 ### Release 시나리오
 
@@ -265,6 +286,8 @@ gitflow-sph/
 │   ├── feature-start.md
 │   ├── feature-commit.md
 │   ├── feature-finish.md
+│   ├── feature-cleanup.md
+│   ├── feature-cleanup-all.md
 │   ├── release-start.md
 │   └── release-finish.md
 └── README.md
