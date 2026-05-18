@@ -95,7 +95,7 @@ git log -n 5 --oneline
 ```
 ✓ committed: <type>(<scope>): <feature-id> <subject>
   files: <count> changed
-  next: 추가 커밋 → /feature-commit, 마무리 → /feature-finish
+  next: 추가 커밋 → /feature-commit, PR 생성 → /feature-pr
 ```
 
 실패(hook):

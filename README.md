@@ -21,7 +21,7 @@ Claude Code 안에서 두 줄만 실행하면 됩니다.
 - 1줄: 이 저장소를 플러그인 마켓플레이스로 등록 (루트의 [.claude-plugin/marketplace.json](.claude-plugin/marketplace.json) 매니페스트를 읽음)
 - 2줄: 마켓플레이스의 `git-flow-sph` 플러그인을 설치
 
-설치 후 `/plugin` 으로 활성 상태를 확인할 수 있고, 슬래시 커맨드 `/feature-start`, `/feature-commit`, `/feature-finish`, `/feature-cleanup`, `/feature-cleanup-all`, `/release-start`, `/release-finish`, `/monday-token`, `/monday-init` 가 노출됩니다.
+설치 후 `/plugin` 으로 활성 상태를 확인할 수 있고, 슬래시 커맨드 `/feature-start`, `/feature-commit`, `/feature-pr`, `/feature-finish`, `/release-start`, `/release-finish`, `/monday-token`, `/monday-init` 가 노출됩니다.
 
 업데이트는 `/plugin marketplace update gitflow-sph` 후 `/plugin install git-flow-sph@gitflow-sph` 를 다시 실행하면 됩니다.
 
@@ -38,7 +38,7 @@ git clone https://github.com/JihoonKim0305/gitflow-sph.git
 
 - `git` (2.30+ 권장)
 - `git-flow` (AVH edition 권장: `brew install git-flow-avh`)
-- `gh` (GitHub CLI) — PR 생성용. 없으면 `/feature-finish` 가 push 까지만 수행하고 안내.
+- `gh` (GitHub CLI) — PR 생성용. 없으면 `/feature-pr` 이 push 까지만 수행하고 안내.
 - `jq` 또는 `node` — `package.json` 버전 갱신용 (선택).
 
 저장소 초기 세팅:
@@ -56,9 +56,8 @@ gh auth status     # 인증 확인
 |---|---|
 | `/feature-start <id-or-name>` | develop 최신화 후 `git flow feature start` |
 | `/feature-commit [메시지 힌트]` | Conventional Commits 형식 커밋 (Feature ID 자동 포함) |
-| `/feature-finish` | squash rebase → push → `gh pr create` |
-| `/feature-cleanup [id]` | PR 머지 확인 후 로컬/원격 feature 브랜치 안전 삭제 (id 미지정 시 현재 브랜치 또는 후보 선택) |
-| `/feature-cleanup-all` | 내가 author 인 머지된 feature 브랜치를 일괄 조회 → 사용자 확인 1회 → 일괄 삭제 |
+| `/feature-pr` | squash rebase → push → `gh pr create` |
+| `/feature-finish [id]` | PR 머지 확인 후 develop 복귀 + 로컬/원격 feature 브랜치 안전 삭제 (id 미지정 시 현재 브랜치 또는 후보 선택) |
 | `/release-start [--major\|--minor\|--patch]` | SemVer 산정 → `git flow release start` → package.json/CHANGELOG 갱신 |
 | `/release-finish` | release → main/develop 머지 + 태그 + push + Monday Release 보드 기록 |
 | `/monday-token <TOKEN>` | Monday.com API 토큰을 `~/.claude/.gitflow-sph-monday.token` 에 저장 (`--clear` 로 삭제) |
@@ -85,10 +84,12 @@ flowchart TD
         FB["feature/&lt;id&gt;"]:::branch
         FC["/feature-commit"]:::cmd
         FCMSG["Conventional Commits 형식<br/>feat(scope): &lt;id&gt; subject"]:::action
-        FF["/feature-finish"]:::cmd
+        FF["/feature-pr"]:::cmd
         FSQ["develop 기준 rebase<br/>+ 비대화형 squash"]:::action
         FPSH["push -u origin feature/&lt;id&gt;"]:::action
         FPR(["gh pr create --base develop"]):::action
+        FFIN["/feature-finish"]:::cmd
+        FDEL["PR 머지 확인<br/>+ develop 복귀<br/>+ 로컬/원격 브랜치 삭제"]:::action
 
         FS --> FB
         FB --> FC
@@ -96,6 +97,8 @@ flowchart TD
         FCMSG -. 반복 .-> FC
         FCMSG --> FF
         FF --> FSQ --> FPSH --> FPR
+        FPR -. "PR 머지 후" .-> FFIN
+        FFIN --> FDEL
     end
 
     %% ===== Release flow =====
@@ -123,6 +126,7 @@ flowchart TD
     %% ===== Safety guard =====
     GUARD["안전 규칙<br/>--no-verify 금지 · 강제 push 금지<br/>충돌 자동 해결 금지 · --ff-only 만 허용"]:::guard
     FF -.- GUARD
+    FFIN -.- GUARD
     RFIN -.- GUARD
 ```
 
@@ -147,8 +151,8 @@ flowchart TD
 #   → feat(auth): 11754215659 handle 401 on expired token
 #     <body>
 
-# 3. 마무리: squash + push + PR
-/feature-finish
+# 3. PR 생성: squash + push + PR
+/feature-pr
 #   → develop pull --ff-only
 #   → git rebase develop
 #   → git rebase -i HEAD~N (비대화형 squash)
@@ -156,12 +160,13 @@ flowchart TD
 #   → gh pr create --base develop
 ```
 
-원격에 같은 브랜치가 이미 있는 경우 `/feature-finish` 는 자동으로 force push 하지 않고 **사용자에게 어떻게 진행할지 묻고 중단**합니다.
+원격에 같은 브랜치가 이미 있는 경우 `/feature-pr` 은 자동으로 force push 하지 않고 **사용자에게 어떻게 진행할지 묻고 중단**합니다.
 
 ```bash
-# 4. PR 이 머지된 뒤 정리
-/feature-cleanup 11754215659
+# 4. PR 이 머지된 뒤 마무리 (git flow feature finish 의 PR 기반 대응)
+/feature-finish 11754215659
 #   → PR #<num> merged 여부 확인 (gh pr list)
+#   → 현재 브랜치가 대상이면 develop 으로 복귀
 #   → develop pull --ff-only
 #   → git branch -d feature/11754215659      (미머지 커밋 있으면 중단)
 #   → git push origin --delete feature/11754215659  (이미 사라졌으면 스킵)
@@ -170,11 +175,6 @@ flowchart TD
 # 또는 인자 없이 호출하면:
 #   - 현재 브랜치가 feature/<x> 면 그것을 대상으로
 #   - 아니면 "내가 author 인 머지된 PR" 후보를 보여주고 선택
-
-# 여러 개를 한 번에:
-/feature-cleanup-all
-#   → 내가 author 인 merged PR ∩ 로컬 feature/* 교집합 조회
-#   → 사용자 확인 1회 → 일괄 삭제 (각 브랜치 독립 처리)
 ```
 
 ### Release 시나리오
@@ -333,9 +333,8 @@ gitflow-sph/
 ├── commands/
 │   ├── feature-start.md
 │   ├── feature-commit.md
+│   ├── feature-pr.md
 │   ├── feature-finish.md
-│   ├── feature-cleanup.md
-│   ├── feature-cleanup-all.md
 │   ├── release-start.md
 │   ├── release-finish.md
 │   ├── monday-token.md

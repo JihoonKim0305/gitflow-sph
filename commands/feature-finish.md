@@ -1,14 +1,25 @@
 ---
-allowed-tools: Bash(git:*), Bash(gh:*), Bash(GIT_SEQUENCE_EDITOR=*), Bash(GIT_EDITOR=*)
-description: feature 브랜치의 모든 커밋을 squash → develop 기준 rebase → push → PR 생성
+allowed-tools: Bash(git:*), Bash(gh:*), Bash(command:*)
+description: PR 머지된 feature 브랜치를 develop 으로 복귀하고 로컬/원격에서 안전하게 삭제 (git flow feature finish 의 PR 기반 대응)
+argument-hint: "[feature-id]"
 ---
 
 ## 공통 규칙 (반드시 준수)
 
-- `--no-verify`, `--force`, `--force-with-lease` 사용 금지. 강제 푸시가 필요해 보이면 항상 사용자에게 묻는다.
-- 머지 기준 브랜치 갱신은 `git pull --ff-only` 만 사용.
-- 충돌 발생 시 자동 해결 금지. `git rebase --abort` 로 즉시 원상복구하고 사용자에게 보고 후 중단.
-- `git flow feature finish` 는 **사용하지 않는다** — 본 워크플로우는 PR 기반이라 develop 머지는 PR 머지로 처리.
+- `--no-verify`, `--force` 사용 금지.
+- 로컬 브랜치 삭제는 항상 `git branch -d` (소문자) 만 사용. `-D` 로 강제 삭제 금지 — 미머지 커밋이 남아 있으면 즉시 중단/보고.
+- 머지 기준 브랜치 갱신은 `git pull --ff-only` 만.
+- **PR 이 머지되지 않은 브랜치는 절대 삭제하지 않는다.** PR 이 open/closed(unmerged) 상태이면 중단하고 사용자에게 보고.
+- 원격 브랜치가 이미 사라진 경우(GitHub auto-delete 등) `git push origin --delete` 의 실패는 정상으로 간주하고 진행한다.
+- 본 명령은 PR 기반 워크플로우에서 `git flow feature finish` 의 마무리 단계(develop 복귀 + feature 브랜치 삭제)에 해당한다. develop 머지 자체는 PR 머지로 이미 처리되어 있어야 한다.
+
+## 인자
+
+`$ARGUMENTS` — 선택적 Feature ID.
+- 비어 있지 않으면 그대로 `feature/<id>` 형태의 대상 브랜치 이름으로 사용.
+- 비어 있으면 다음 우선순위로 결정:
+  1. 현재 브랜치가 `feature/<x>` 패턴이면 그 브랜치를 대상으로 사용.
+  2. 그 외의 경우 "내가 author 이고 머지된 PR" 후보를 조회한 뒤 사용자에게 선택을 받는다.
 
 ## 컨텍스트 수집 (병렬)
 
@@ -17,185 +28,165 @@ git rev-parse --is-inside-work-tree
 git branch --show-current
 git status --short
 git remote -v
-git rev-parse --verify HEAD
-```
-
-검증:
-- 현재 브랜치가 `feature/<id>` 패턴이어야 함. 아니면 즉시 중단.
-- working tree 가 깨끗해야 함. 더러우면 중단하고 사용자에게 알림.
-- 원격 `origin` 이 있어야 함.
-
-`FEATURE_BRANCH = git branch --show-current` 의 결과로 저장.  
-`FEATURE_ID = FEATURE_BRANCH` 에서 `feature/` 접두사 제거한 부분.
-
-## 실행 절차
-
-### 1) 원상복구용 SHA 백업
-
-```bash
-PRE_FINISH_SHA=$(git rev-parse HEAD)
-```
-
-이후 단계에서 문제가 생기면 `git reset --hard "$PRE_FINISH_SHA"` 로 되돌릴 수 있도록 사용자에게 출력.
-
-### 2) develop 최신화
-
-```bash
-git checkout develop
-git pull --ff-only origin develop
-git checkout "$FEATURE_BRANCH"
-```
-
-ff-only 실패 시 즉시 중단 + 보고.
-
-### 3) develop 기준 rebase
-
-```bash
-git rebase develop
-```
-
-충돌 발생 시:
-
-```bash
-git rebase --abort
-```
-
-이후 사용자에게 "충돌이 발생해 자동 해결하지 않고 중단했습니다. 수동으로 rebase 후 다시 호출해주세요." 라고 보고하고 종료.
-
-### 4) 커밋 개수 계산 후 squash rebase
-
-```bash
-BASE=$(git merge-base HEAD develop)
-N=$(git rev-list --count "$BASE"..HEAD)
-```
-
-- `N <= 1` 이면 squash 불필요. 5단계로 건너뜀.
-- `N >= 2` 이면 비대화형 interactive rebase 실행:
-
-```bash
-GIT_SEQUENCE_EDITOR="sed -i.bak -e '2,\$s/^pick /squash /'" \
-GIT_EDITOR=true \
-git rebase -i HEAD~"$N"
-```
-
-설명:
-- `GIT_SEQUENCE_EDITOR` 가 todo 리스트를 받아 2번째 줄부터 끝까지를 `squash` 로 변환 (첫 줄은 `pick` 유지).
-- `GIT_EDITOR=true` 로 squash 합산 메시지 편집 단계를 비대화형으로 통과시킴 (원본 메시지가 모두 보존됨).
-- macOS sed 호환을 위해 `-i.bak` 사용. 끝나면 `.bak` 파일 정리는 git 이 임시 디렉터리에서 처리하므로 별도 작업 불필요.
-
-충돌 시 동일하게 `git rebase --abort` 후 중단/보고.
-
-### 5) Squash 결과 메시지 정리
-
-```bash
-git log -1 --pretty=%B
-```
-
-결과를 사용자에게 보여주고, Feature ID 가 description 앞에 명시되어 있는지 확인.
-
-명시되어 있지 않거나 메시지가 누적된 raw 형태로 어지러우면, 다음 형식으로 amend:
-
-```
-<type>(<scope>): <feature-id> <통합 subject>
-
-<body — 이 브랜치에서 한 일과 그 이유를 3~6줄로 정리>
-```
-
-사용자에게 amend 메시지 초안을 한 번 보여주고 동의를 받은 뒤:
-
-```bash
-git commit --amend -m "$(cat <<'EOF'
-<final message>
-EOF
-)"
-```
-
-### 6) 원격 상태 확인 후 push
-
-원격에 같은 브랜치가 이미 존재하는지 확인:
-
-```bash
-git ls-remote --heads origin "$FEATURE_BRANCH"
-```
-
-- **결과가 비어 있음 (원격에 없음)** → 일반 push 진행:
-  ```bash
-  git push -u origin "$FEATURE_BRANCH"
-  ```
-- **결과가 존재함 (원격에 이미 있음)** → squash rebase 후의 push 는 강제 푸시가 필요함. **자동으로 진행하지 않는다.** 다음 메시지를 출력하고 중단:
-  ```
-  ⚠ 원격에 feature/<id> 가 이미 존재합니다.
-    squash rebase 결과를 푸시하려면 강제 푸시가 필요합니다.
-    이 플러그인은 자동으로 force push 하지 않습니다.
-
-    선택지:
-      a) git push --force-with-lease origin <branch>  (사용자가 직접 실행)
-      b) PR 을 닫고 새 브랜치/PR 로 진행
-      c) 중단하고 PRE_FINISH_SHA(<sha>) 로 reset --hard 후 재구성
-
-    어떻게 진행할지 알려주세요.
-  ```
-  사용자 응답을 받기 전까지는 아무 것도 하지 않는다.
-
-### 7) PR 생성
-
-`gh` CLI 가 설치되어 있는지 확인:
-
-```bash
 command -v gh
 ```
 
-없으면 사용자에게 알리고 push 까지만 완료한 상태로 종료.
+검증:
+- git 저장소가 아니면 즉시 중단.
+- working tree 가 더러우면 중단 후 사용자에게 안내 (stash / 커밋 / 중단 선택).
+- 원격 `origin` 이 존재해야 함.
+- `gh` 가 없으면 머지 여부 확인이 불가능하므로 중단하고 사용자에게 알림.
 
-설치되어 있으면:
+## 대상 결정
 
-```bash
-gh pr create \
-  --base develop \
-  --head "$FEATURE_BRANCH" \
-  --title "<squashed commit subject>" \
-  --body "$(cat <<'EOF'
-## Summary
-- <변경 요약 — squashed 커밋 메시지 기반 1~3줄>
+### 인자가 있는 경우
 
-## Why
-- <변경한 이유 / 배경>
-
-## Test Plan
-- [ ] <확인 포인트 1>
-- [ ] <확인 포인트 2>
-
-## Related
-- Feature ID: <feature-id>
-EOF
-)"
+```
+TARGET_BRANCH = "feature/$ARGUMENTS"
 ```
 
-- title 은 squash 후 커밋 subject 와 동일하게.
-- PR 생성 후 반환되는 URL 을 사용자에게 출력.
+### 인자가 없고 현재 브랜치가 feature 인 경우
+
+```
+TARGET_BRANCH = $(git branch --show-current)
+```
+
+### 인자가 없고 현재 브랜치가 feature 가 아닌 경우
+
+내가 author 인 머지된 PR 후보 조회:
+
+```bash
+gh pr list \
+  --author @me \
+  --state merged \
+  --json number,title,headRefName,mergedAt \
+  --limit 30
+```
+
+- 결과가 비어 있으면 "정리할 대상이 없습니다" 라고 보고하고 종료.
+- `headRefName` 이 `feature/` 로 시작하는 항목만 필터링.
+- 로컬에 해당 브랜치가 실제로 존재하는 것만 추리기 위해 다음을 추가로 사용:
+
+```bash
+git branch --list 'feature/*' --format '%(refname:short)'
+```
+
+- 두 목록의 교집합을 후보로 제시. 후보가 0개면 "로컬에 남은 머지된 feature 브랜치가 없습니다" 보고 후 종료.
+- 후보 1개면 자동 선택해 사용자에게 확인 1회.
+- 후보 2개 이상이면 `AskUserQuestion` 으로 목록을 보여주고 하나만 선택.
+
+## 검증 단계 (대상 브랜치 확정 후 필수)
+
+### 1) 브랜치 존재 확인
+
+```bash
+git show-ref --verify --quiet "refs/heads/$TARGET_BRANCH"
+```
+
+실패하면 "로컬에 $TARGET_BRANCH 가 없습니다" 라고 보고 후 종료 (원격만 남은 경우는 별도 처리 — 아래 6단계 참고).
+
+### 2) PR 머지 여부 확인
+
+```bash
+gh pr list \
+  --head "$TARGET_BRANCH" \
+  --state all \
+  --json number,state,mergedAt,author \
+  --limit 5
+```
+
+판정:
+- 결과가 비어 있음 → PR 자체가 없음. "$TARGET_BRANCH 와 연결된 PR 을 찾을 수 없습니다. /feature-pr 이 완료되지 않았거나 다른 브랜치로 PR 이 생성되었을 수 있습니다." 보고 후 종료.
+- 가장 최근 PR 의 `state` 가 `MERGED` 가 아니면 → 중단:
+  ```
+  ✗ feature/<id> 의 PR(#<num>) 이 아직 머지되지 않았습니다 (state: <state>).
+    finish 는 PR 머지 이후에만 수행할 수 있습니다.
+  ```
+- `state == MERGED` 이면 머지 SHA / 머지 시각을 사용자에게 출력하고 계속.
+
+### 3) 현재 브랜치가 대상이면 develop 으로 이동
+
+```bash
+CURRENT=$(git branch --show-current)
+if [ "$CURRENT" = "$TARGET_BRANCH" ]; then
+  git checkout develop
+fi
+```
+
+### 4) develop 최신화
+
+```bash
+git pull --ff-only origin develop
+```
+
+ff-only 실패 시 즉시 중단 + 보고. develop 이 충분히 최신화되어야 `git branch -d` 가 "이미 머지됨" 으로 판단할 수 있다.
+
+### 5) 로컬 브랜치 삭제
+
+```bash
+git branch -d "$TARGET_BRANCH"
+```
+
+- 성공 → 6단계 진행.
+- 실패(미머지 커밋 존재) → **절대 `-D` 로 재시도하지 않는다.** 다음과 같이 보고하고 종료:
+  ```
+  ✗ $TARGET_BRANCH 에 develop 으로 머지되지 않은 커밋이 남아 있습니다.
+    PR 은 머지되었지만 로컬 브랜치에 추가 커밋이 있을 수 있습니다.
+    수동 확인 후 git branch -D 로 강제 삭제하거나 push 후 다시 시도해주세요.
+
+    참고:
+      git log develop..$TARGET_BRANCH
+  ```
+
+### 6) 원격 브랜치 삭제
+
+원격에 같은 브랜치가 남아 있는지 확인:
+
+```bash
+git ls-remote --heads origin "$TARGET_BRANCH"
+```
+
+- 결과가 비어 있음 → GitHub auto-delete 등으로 이미 제거됨. 건너뜀.
+- 결과가 존재 → 삭제:
+  ```bash
+  git push origin --delete "$TARGET_BRANCH"
+  ```
+  실패 시 stderr 를 그대로 사용자에게 보여주고 종료 (강제 삭제 재시도 금지).
+
+### 7) 원격 추적 정리
+
+```bash
+git fetch --prune origin
+```
 
 ## 출력 형식
 
 성공:
 ```
-✓ feature/<id> 정리 완료
-  squashed: <N> commits → 1
-  rebased onto: develop @ <sha>
-  pushed: origin/feature/<id>
-  PR: <url>
-  rollback: git reset --hard <PRE_FINISH_SHA>
+✓ feature/<id> finish 완료
+  PR:     #<num> merged at <mergedAt>
+  local:  deleted
+  remote: deleted (or already gone)
+  pruned: origin tracking refs
 ```
 
-중단(충돌/원격 충돌):
+중단(머지 안 됨):
 ```
-✗ 중단됨: <사유>
-  현재 상태: <branch> @ <sha>
-  복구: git reset --hard <PRE_FINISH_SHA>
+✗ 중단됨: feature/<id> 의 PR 이 아직 머지되지 않음
+  PR #<num> state=<state>
+  PR 머지 후 다시 시도해주세요.
+```
+
+중단(미머지 커밋):
+```
+✗ 중단됨: 로컬에 develop 으로 머지되지 않은 커밋 존재
+  diff:   git log develop..feature/<id>
+  강제 삭제가 필요하면 사용자가 직접 git branch -D 를 실행해주세요.
 ```
 
 ## 금지 사항
 
-- `git flow feature finish` 실행 금지 (develop 머지는 PR 머지로).
-- 강제 푸시 자동 수행 금지.
-- 충돌 자동 해결 금지.
+- `git branch -D` 자동 실행 금지.
+- 원격 강제 푸시/삭제 재시도 금지.
+- PR 머지 여부 확인 없이 삭제 금지.
 - `--no-verify` 사용 금지.
