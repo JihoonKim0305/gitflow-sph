@@ -207,7 +207,38 @@ if [ -z "$BOARD_ID" ] || [ "$COL_VERSION" = "REPLACE_WITH_COLUMN_ID" ]; then
 fi
 ```
 
-#### 5-4) Release 보드에 아이템 생성
+#### 5-4) 릴리즈 그룹 ID 자동 탐색 (선택)
+
+릴리즈 아이템은 "릴리즈" 또는 "Release" 그룹에 추가한다. 보드의 그룹 목록을 조회한 뒤 title 이 `릴리즈|release` 에 매칭되는 첫 그룹을 사용한다. 매칭 실패 시 기본 그룹에 생성한다 (비차단).
+
+```bash
+RELEASE_GROUP_ID=""
+RELEASE_GROUP_TITLE=""
+
+if [ "$MONDAY_STATUS" = "run" ]; then
+  GROUP_QUERY=$(jq -nc --arg id "$BOARD_ID" \
+    '{query:"query($id:ID!){boards(ids:[$id]){groups{id title}}}",variables:{id:$id}}')
+
+  GROUPS_RESPONSE=$(curl -sS -X POST https://api.monday.com/v2 \
+    -H "Authorization: $MONDAY_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d "$GROUP_QUERY")
+
+  # title 이 "릴리즈" 또는 "release" (대소문자 무시) 를 포함하는 첫 그룹
+  MATCHED=$(echo "$GROUPS_RESPONSE" \
+    | jq -r '.data.boards[0].groups[]? | select((.title // "") | test("릴리즈|release"; "i")) | "\(.id)\t\(.title)"' \
+    | head -n 1)
+
+  if [ -n "$MATCHED" ]; then
+    RELEASE_GROUP_ID=$(echo "$MATCHED" | cut -f1)
+    RELEASE_GROUP_TITLE=$(echo "$MATCHED" | cut -f2)
+  else
+    echo "ℹ monday: '릴리즈/Release' 그룹을 찾지 못해 기본 그룹에 생성합니다."
+  fi
+fi
+```
+
+#### 5-5) Release 보드에 아이템 생성
 
 ```bash
 if [ "$MONDAY_STATUS" = "run" ]; then
@@ -226,12 +257,16 @@ if [ "$MONDAY_STATUS" = "run" ]; then
     --arg cc "$COL_CHANGELOG" \
     '{($cv):$v, ($cd):{date:$d}, ($cf):$fids, ($cc):$cl}')
 
+  # group_id 는 nullable 변수로 선언 — 빈 값이면 null 전달, Monday 는 기본 그룹에 생성.
+  GROUP_ARG=$([ -n "$RELEASE_GROUP_ID" ] && echo "$RELEASE_GROUP_ID" || echo "null")
+
   # column_values 는 GraphQL JSON 타입이므로 문자열로 직렬화해서 전달
   MUTATION=$(jq -nc \
     --arg b "$BOARD_ID" \
     --arg n "v$VERSION" \
     --arg cv "$COLUMN_VALUES" \
-    '{query:"mutation($b:ID!,$n:String!,$cv:JSON!){create_item(board_id:$b,item_name:$n,column_values:$cv){id}}",variables:{b:$b,n:$n,cv:$cv}}')
+    --arg g "$RELEASE_GROUP_ID" \
+    '{query:"mutation($b:ID!,$g:String,$n:String!,$cv:JSON!){create_item(board_id:$b,group_id:$g,item_name:$n,column_values:$cv){id}}",variables:{b:$b,g:(if $g=="" then null else $g end),n:$n,cv:$cv}}')
 
   RESPONSE=$(curl -sS -X POST https://api.monday.com/v2 \
     -H "Authorization: $MONDAY_TOKEN" \
@@ -243,8 +278,13 @@ if [ "$MONDAY_STATUS" = "run" ]; then
 
   if [ -n "$NEW_ITEM_ID" ]; then
     MONDAY_STATUS="ok"
-    MONDAY_DETAIL="board $BOARD_ID, item $NEW_ITEM_ID"
-    echo "✓ monday: Release 아이템 생성 (board $BOARD_ID, item $NEW_ITEM_ID)"
+    if [ -n "$RELEASE_GROUP_ID" ]; then
+      MONDAY_DETAIL="board $BOARD_ID, group '$RELEASE_GROUP_TITLE' ($RELEASE_GROUP_ID), item $NEW_ITEM_ID"
+      echo "✓ monday: Release 아이템 생성 (board $BOARD_ID, group '$RELEASE_GROUP_TITLE', item $NEW_ITEM_ID)"
+    else
+      MONDAY_DETAIL="board $BOARD_ID, item $NEW_ITEM_ID (default group)"
+      echo "✓ monday: Release 아이템 생성 (board $BOARD_ID, item $NEW_ITEM_ID, default group)"
+    fi
   else
     MONDAY_STATUS="fail"
     MONDAY_DETAIL="${ERROR_MSG:-알 수 없는 오류}"
@@ -266,8 +306,10 @@ fi
   merged into: main, develop (no-ff)
   tagged:      v<VERSION>
   pushed:      origin/main, origin/develop, refs/tags/v<VERSION>
-  monday:      Release 아이템 생성 (board <BOARD_ID>, item <NEW_ITEM_ID>)
+  monday:      Release 아이템 생성 (board <BOARD_ID>, group '<GROUP_TITLE>', item <NEW_ITEM_ID>)
 ```
+
+그룹 매칭 실패 시 `group '<GROUP_TITLE>'` 부분이 `default group` 으로 대체된다.
 
 성공 (Monday skip / 실패):
 ```
