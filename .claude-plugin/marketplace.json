@@ -1,0 +1,17 @@
+{
+  "name": "gitflow-sph",
+  "owner": {
+    "name": "JihoonKim0305"
+  },
+  "description": "git-flow + Conventional Commits + SemVer 자동화 Claude Code 플러그인",
+  "plugins": [
+    {
+      "name": "git-flow-sph",
+      "source": "./git-flow-sph",
+      "description": "git-flow + Conventional Commits + SemVer 자동화 (feature/release 워크플로우)",
+      "version": "0.1.0",
+      "category": "engineering",
+      "keywords": ["git", "git-flow", "conventional-commits", "semver", "release", "workflow"]
+    }
+  ]
+}
