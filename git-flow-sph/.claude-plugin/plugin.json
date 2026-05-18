@@ -1,0 +1,10 @@
+{
+  "name": "git-flow-sph",
+  "version": "0.1.0",
+  "description": "git-flow + Conventional Commits + SemVer 자동화 (feature/release 워크플로우)",
+  "category": "engineering",
+  "keywords": ["git", "git-flow", "conventional-commits", "semver", "release", "workflow"],
+  "author": {
+    "name": "SPH"
+  }
+}
