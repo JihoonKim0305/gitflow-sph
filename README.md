@@ -3,7 +3,7 @@
 > git-flow + Conventional Commits + SemVer 자동화 Claude Code 플러그인 (SPH)
 
 Feature 개발과 Release 작업을 두 갈래의 슬래시 커맨드로 자동화합니다.
-모든 커맨드는 **PR 기반 워크플로우**를 전제로 합니다 (`git flow feature finish`는 사용하지 않음).
+모든 커맨드는 **PR 기반 워크플로우**를 전제로 합니다.
 
 ---
 
