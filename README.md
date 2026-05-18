@@ -18,7 +18,7 @@ Claude Code 안에서 두 줄만 실행하면 됩니다.
 /plugin install git-flow-sph@gitflow-sph
 ```
 
-- 1줄: 이 저장소를 플러그인 마켓플레이스로 등록 (루트의 [.claude-plugin/marketplace.json](../.claude-plugin/marketplace.json) 매니페스트를 읽음)
+- 1줄: 이 저장소를 플러그인 마켓플레이스로 등록 (루트의 [.claude-plugin/marketplace.json](.claude-plugin/marketplace.json) 매니페스트를 읽음)
 - 2줄: 마켓플레이스의 `git-flow-sph` 플러그인을 설치
 
 설치 후 `/plugin` 으로 활성 상태를 확인할 수 있고, 슬래시 커맨드 `/feature-start`, `/feature-commit`, `/feature-finish`, `/release-start`, `/release-finish` 가 노출됩니다.
@@ -257,8 +257,9 @@ BREAKING CHANGE 는 type 뒤에 `!` 또는 body 에 `BREAKING CHANGE:` 표기.
 ## 디렉터리 구조
 
 ```
-git-flow-sph/
+gitflow-sph/
 ├── .claude-plugin/
+│   ├── marketplace.json
 │   └── plugin.json
 ├── commands/
 │   ├── feature-start.md
