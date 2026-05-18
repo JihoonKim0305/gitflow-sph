@@ -55,7 +55,7 @@ gh auth status     # 인증 확인
 | 커맨드 | 용도 |
 |---|---|
 | `/feature-start <id-or-name>` | develop 최신화 후 `git flow feature start` |
-| `/feature-commit [메시지 힌트]` | Conventional Commits 형식 커밋 (Feature ID + Co-Authored-By 자동 포함) |
+| `/feature-commit [메시지 힌트]` | Conventional Commits 형식 커밋 (Feature ID 자동 포함) |
 | `/feature-finish` | squash rebase → push → `gh pr create` |
 | `/feature-cleanup [id]` | PR 머지 확인 후 로컬/원격 feature 브랜치 안전 삭제 (id 미지정 시 현재 브랜치 또는 후보 선택) |
 | `/feature-cleanup-all` | 내가 author 인 머지된 feature 브랜치를 일괄 조회 → 사용자 확인 1회 → 일괄 삭제 |
@@ -84,7 +84,7 @@ flowchart TD
         FS["/feature-start &lt;id&gt;"]:::cmd
         FB["feature/&lt;id&gt;"]:::branch
         FC["/feature-commit"]:::cmd
-        FCMSG["Conventional Commits 형식<br/>feat(scope): &lt;id&gt; subject<br/>+ Co-Authored-By"]:::action
+        FCMSG["Conventional Commits 형식<br/>feat(scope): &lt;id&gt; subject"]:::action
         FF["/feature-finish"]:::cmd
         FSQ["develop 기준 rebase<br/>+ 비대화형 squash"]:::action
         FPSH["push -u origin feature/&lt;id&gt;"]:::action
@@ -146,7 +146,6 @@ flowchart TD
 /feature-commit "토큰 만료 시 401 처리 추가"
 #   → feat(auth): 11754215659 handle 401 on expired token
 #     <body>
-#     Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 
 # 3. 마무리: squash + push + PR
 /feature-finish
@@ -212,7 +211,7 @@ flowchart TD
 2. **강제 푸시 금지** — `--force`, `--force-with-lease` 자동 수행 안 함. 필요해 보이면 사용자에게 결정 위임.
 3. **머지 기준 브랜치 최신화는 `--ff-only` 만** — non-ff 발생 시 즉시 중단.
 4. **충돌 자동 해결 금지** — `rebase --abort` / `merge --abort` 로 원상복구.
-5. **한 커밋 = 하나의 논리적 변경** — Conventional Commits + Feature ID + Co-Authored-By 트레일러.
+5. **한 커밋 = 하나의 논리적 변경** — Conventional Commits + Feature ID.
 6. **`git add -A` / `.` 금지** — 파일을 명시적으로 지정해 스테이징.
 
 ---
@@ -223,8 +222,6 @@ flowchart TD
 <type>[(<scope>)]: <feature-id> <subject>
 
 <body — 왜 변경했는지에 초점>
-
-Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 ```
 
 type: `feat` / `fix` / `refactor` / `docs` / `test` / `chore` / `style` / `perf` / `ci`

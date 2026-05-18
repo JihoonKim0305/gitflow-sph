@@ -10,7 +10,7 @@ argument-hint: "<feature-id-or-name>"
 - `--no-verify`, `--force`, `--force-with-lease` 사용 금지. 강제 푸시가 필요해 보이는 상황이라도 절대 단독 결정하지 말고 사용자에게 묻는다.
 - 머지 기준 브랜치(`develop`/`main`) 갱신은 항상 `git pull --ff-only`만 사용한다.
 - 충돌 발생 시 자동 해결 금지. 즉시 중단 + 원상복구 + 사용자에게 보고.
-- 한 커밋 = 하나의 논리적 변경. Conventional Commits + Feature ID + `Co-Authored-By` 트레일러 필수.
+- 한 커밋 = 하나의 논리적 변경. Conventional Commits + Feature ID 필수.
 
 ## 인자
 

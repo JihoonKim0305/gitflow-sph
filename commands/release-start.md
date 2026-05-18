@@ -9,7 +9,6 @@ argument-hint: "[--major|--minor|--patch] (선택)"
 - `--no-verify`, `--force`, `--force-with-lease` 금지.
 - `git pull --ff-only` 만 사용. 충돌/non-ff 발생 시 즉시 중단.
 - 충돌 자동 해결 금지.
-- 커밋 메시지에 `Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>` 트레일러 필수.
 
 ## 컨텍스트 수집 (병렬)
 
@@ -179,8 +178,6 @@ chore(release): <NEW_VERSION>
 
 - bump version to <NEW_VERSION>
 - update CHANGELOG with release notes
-
-Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 EOF
 )"
 ```

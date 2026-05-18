@@ -8,7 +8,6 @@ description: release 브랜치를 main/develop 에 머지하고 태그 + push + 
 - `--no-verify`, `--force`, `--force-with-lease` 금지.
 - `git pull --ff-only` 만 사용.
 - 충돌 발생 시 자동 해결 금지. 즉시 `git merge --abort`, 필요 시 `git reset --hard "$PRE_FINISH_SHA"` 로 원상복구하고 사용자에게 보고.
-- 커밋 메시지에 `Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>` 트레일러 (필요 시) 포함.
 
 ## 컨텍스트 수집 (병렬)
 

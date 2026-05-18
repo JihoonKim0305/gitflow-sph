@@ -1,6 +1,6 @@
 ---
 allowed-tools: Bash(git:*)
-description: 변경 사항을 Conventional Commits 형식으로 커밋한다 (Feature ID + Co-Authored-By 자동 포함)
+description: 변경 사항을 Conventional Commits 형식으로 커밋한다 (Feature ID 자동 포함)
 argument-hint: "[메시지 힌트]"
 ---
 
@@ -8,7 +8,6 @@ argument-hint: "[메시지 힌트]"
 
 - `--no-verify` 절대 금지. pre-commit / commit-msg hook 실패 시 그 사실만 보고하고 중단한다 (재시도/우회 없음).
 - 한 커밋 = 하나의 논리적 변경. 여러 의도가 섞여 있으면 분리.
-- 커밋 메시지 끝에 항상 `Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>` 트레일러를 포함한다.
 - Feature ID는 description 맨 앞에 명시한다.
 - `git add -A` / `git add .` 금지 — 명시적으로 파일을 지정해 스테이징한다.
 - 시크릿 의심 파일(`.env`, `*credentials*`, `*.pem`, `*.key`) 은 사용자 명시 동의 없이는 스테이징하지 않는다.
@@ -43,8 +42,6 @@ git log -n 5 --oneline
 <type>[(<scope>)]: <feature-id> <subject>
 
 <body — 왜 변경했는지에 초점. 무엇을 했는지는 diff가 말해줌>
-
-Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 ```
 
 타입 자동 선택 (diff 분석 기반):
@@ -77,8 +74,6 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
    <type>(<scope>): <feature-id> <subject>
 
    <body>
-
-   Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
    EOF
    )"
    git status --short

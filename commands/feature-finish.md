@@ -99,8 +99,6 @@ git log -1 --pretty=%B
 <type>(<scope>): <feature-id> <통합 subject>
 
 <body — 이 브랜치에서 한 일과 그 이유를 3~6줄로 정리>
-
-Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 ```
 
 사용자에게 amend 메시지 초안을 한 번 보여주고 동의를 받은 뒤:
