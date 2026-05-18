@@ -1,0 +1,10 @@
+{
+  "release_board_id": "1234567890",
+  "release_item_name_template": "v{version}",
+  "columns": {
+    "version": "text_column_id",
+    "date": "date_column_id",
+    "feature_ids": "long_text_column_id",
+    "changelog": "long_text_column_id"
+  }
+}

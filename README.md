@@ -21,7 +21,7 @@ Claude Code 안에서 두 줄만 실행하면 됩니다.
 - 1줄: 이 저장소를 플러그인 마켓플레이스로 등록 (루트의 [.claude-plugin/marketplace.json](.claude-plugin/marketplace.json) 매니페스트를 읽음)
 - 2줄: 마켓플레이스의 `git-flow-sph` 플러그인을 설치
 
-설치 후 `/plugin` 으로 활성 상태를 확인할 수 있고, 슬래시 커맨드 `/feature-start`, `/feature-commit`, `/feature-finish`, `/feature-cleanup`, `/feature-cleanup-all`, `/release-start`, `/release-finish` 가 노출됩니다.
+설치 후 `/plugin` 으로 활성 상태를 확인할 수 있고, 슬래시 커맨드 `/feature-start`, `/feature-commit`, `/feature-finish`, `/feature-cleanup`, `/feature-cleanup-all`, `/release-start`, `/release-finish`, `/monday-token`, `/monday-init` 가 노출됩니다.
 
 업데이트는 `/plugin marketplace update gitflow-sph` 후 `/plugin install git-flow-sph@gitflow-sph` 를 다시 실행하면 됩니다.
 
@@ -60,7 +60,9 @@ gh auth status     # 인증 확인
 | `/feature-cleanup [id]` | PR 머지 확인 후 로컬/원격 feature 브랜치 안전 삭제 (id 미지정 시 현재 브랜치 또는 후보 선택) |
 | `/feature-cleanup-all` | 내가 author 인 머지된 feature 브랜치를 일괄 조회 → 사용자 확인 1회 → 일괄 삭제 |
 | `/release-start [--major\|--minor\|--patch]` | SemVer 산정 → `git flow release start` → package.json/CHANGELOG 갱신 |
-| `/release-finish` | release → main/develop 머지 + 태그 + push |
+| `/release-finish` | release → main/develop 머지 + 태그 + push + Monday Release 보드 기록 |
+| `/monday-token <TOKEN>` | Monday.com API 토큰을 `~/.claude/.gitflow-sph-monday.token` 에 저장 (`--clear` 로 삭제) |
+| `/monday-init [board_id]` | 프로젝트 루트에 `monday.config.json` 생성 (토큰 있으면 컬럼 자동 매핑) |
 
 ---
 
@@ -267,9 +269,58 @@ BREAKING CHANGE 는 type 뒤에 `!` 또는 body 에 `BREAKING CHANGE:` 표기.
 
 ---
 
+## Monday.com 연동
+
+`/release-finish` 가 release 마지막 단계에서 Monday.com Release 보드에 새 아이템을 자동 생성합니다 (버전, 일자, 연결된 Feature ID 목록, CHANGELOG 본문).
+
+### 활성화 (2단계)
+
+```bash
+# 1. API 토큰 등록 (한 번만)
+/monday-token <YOUR_MONDAY_API_TOKEN>
+#   → ~/.claude/.gitflow-sph-monday.token 에 저장
+#   → 또는 CI 환경에서는 MONDAY_API_TOKEN 환경변수 사용 (env 가 파일보다 우선)
+
+# 2. 설정 파일 생성 (프로젝트마다 한 번)
+/monday-init <RELEASE_BOARD_ID>
+#   → 토큰이 있으면 보드의 컬럼 목록을 조회해서 4개 필드(version/date/feature_ids/changelog)를 대화형으로 매핑
+#   → 결과: 프로젝트 루트에 monday.config.json 생성
+```
+
+### 설정 파일 스키마 (`monday.config.json`)
+
+```json
+{
+  "release_board_id": "1234567890",
+  "release_item_name_template": "v{version}",
+  "columns": {
+    "version": "text_column_id",
+    "date": "date_column_id",
+    "feature_ids": "long_text_column_id",
+    "changelog": "long_text_column_id"
+  }
+}
+```
+
+`monday.config.example.json` 을 참고하거나 `/monday-init` 으로 자동 생성하세요.
+
+### 동작 보장
+
+- **비차단**: Monday 단계가 실패해도 release-finish 전체는 성공 처리됩니다 (git push 는 이미 완료된 상태).
+- **자동 skip**: 토큰 또는 `monday.config.json` 이 없으면 `monday: skip (사유)` 만 출력하고 정상 종료.
+- **Feature ID 추출**: CHANGELOG 의 `(<숫자8자리이상>)` 표기에서 자동 수집. SHA 와 구분됩니다.
+
+### 보안 주의
+
+- 토큰 파일(`~/.claude/.gitflow-sph-monday.token`)은 **평문 저장**입니다. 다중 사용자 시스템에서는 사용자 home 권한을 점검하세요.
+- `monday.config.json` 은 토큰을 포함하지 않으므로 커밋 가능합니다 (사내 정책에 따라 `.gitignore` 추가 고려).
+- `/monday-token` 은 토큰 전체를 출력하지 않고 앞 4자 + 길이만 마스킹해서 보여줍니다.
+
+---
+
 ## 향후 작업
 
-- **Monday.com 보드 업데이트는 후속 작업**입니다. `/release-finish` 종료 시 보드 항목 상태 전환 / 릴리즈 노트 게시 기능은 현재 placeholder (`# TODO`) 로만 들어 있으며, Monday MCP 연동을 명시적으로 요청하시면 별도 작업으로 구현 예정입니다.
+- 각 Feature 아이템의 status 를 'Released' 로 일괄 전환 (현재는 Release 보드 기록만 수행).
 - 자동 changelog 그루핑(예: `BREAKING` 정렬)에 대한 사용자 정의 룰.
 - pre-commit hook 실패 시 표준 안내 메시지 템플릿화.
 
@@ -289,7 +340,10 @@ gitflow-sph/
 │   ├── feature-cleanup.md
 │   ├── feature-cleanup-all.md
 │   ├── release-start.md
-│   └── release-finish.md
+│   ├── release-finish.md
+│   ├── monday-token.md
+│   └── monday-init.md
+├── monday.config.example.json
 └── README.md
 ```
 
