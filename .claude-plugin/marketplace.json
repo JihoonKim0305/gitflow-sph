@@ -7,7 +7,10 @@
   "plugins": [
     {
       "name": "git-flow-sph",
-      "source": ".",
+      "source": {
+        "source": "github",
+        "repo": "JihoonKim0305/gitflow-sph"
+      },
       "description": "git-flow + Conventional Commits + SemVer 자동화 (feature/release 워크플로우)",
       "version": "0.1.0",
       "category": "engineering",
