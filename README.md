@@ -57,7 +57,7 @@ gh auth status     # 인증 확인
 | `/feature-start <id-or-name>` | develop 최신화 후 `git flow feature start` |
 | `/feature-commit [메시지 힌트]` | Conventional Commits 형식 커밋 (Feature ID 자동 포함) |
 | `/feature-pr` | squash rebase → push → `gh pr create` |
-| `/feature-finish [id]` | PR 머지 확인 후 develop 복귀 + 로컬/원격 feature 브랜치 안전 삭제 (id 미지정 시 현재 브랜치 또는 후보 선택) |
+| `/feature-finish [id]` | feature 브랜치를 develop 으로 `--no-ff` 머지 + push + 로컬/원격 feature 브랜치 안전 삭제 (`git flow feature finish` 동작) |
 | `/release-start [--major\|--minor\|--patch]` | SemVer 산정 → `git flow release start` → package.json/CHANGELOG 갱신 |
 | `/release-finish` | release → main/develop 머지 + 태그 + push + Monday Release 보드 기록 |
 | `/monday-token <TOKEN>` | Monday.com API 토큰을 `~/.claude/.gitflow-sph-monday.token` 에 저장 (`--clear` 로 삭제) |
@@ -89,7 +89,7 @@ flowchart TD
         FPSH["push -u origin feature/&lt;id&gt;"]:::action
         FPR(["gh pr create --base develop"]):::action
         FFIN["/feature-finish"]:::cmd
-        FDEL["PR 머지 확인<br/>+ develop 복귀<br/>+ 로컬/원격 브랜치 삭제"]:::action
+        FDEL["develop ← feature (--no-ff)<br/>+ push develop<br/>+ 로컬/원격 브랜치 삭제"]:::action
 
         FS --> FB
         FB --> FC
@@ -97,7 +97,7 @@ flowchart TD
         FCMSG -. 반복 .-> FC
         FCMSG --> FF
         FF --> FSQ --> FPSH --> FPR
-        FPR -. "PR 머지 후" .-> FFIN
+        FPR -. "PR 리뷰/머지(선택)" .-> FFIN
         FFIN --> FDEL
     end
 
@@ -163,18 +163,19 @@ flowchart TD
 원격에 같은 브랜치가 이미 있는 경우 `/feature-pr` 은 자동으로 force push 하지 않고 **사용자에게 어떻게 진행할지 묻고 중단**합니다.
 
 ```bash
-# 4. PR 이 머지된 뒤 마무리 (git flow feature finish 의 PR 기반 대응)
+# 4. 마무리: develop 으로 머지 + 브랜치 삭제 (git flow feature finish 동작)
 /feature-finish 11754215659
-#   → PR #<num> merged 여부 확인 (gh pr list)
-#   → 현재 브랜치가 대상이면 develop 으로 복귀
+#   → develop 체크아웃
 #   → develop pull --ff-only
-#   → git branch -d feature/11754215659      (미머지 커밋 있으면 중단)
+#   → git merge --no-ff feature/11754215659    (충돌 시 abort + reset)
+#   → git push origin develop                  (실패 시 로컬 머지 유지, 중단)
+#   → git branch -d feature/11754215659        (미머지 커밋 있으면 중단)
 #   → git push origin --delete feature/11754215659  (이미 사라졌으면 스킵)
 #   → git fetch --prune origin
 
 # 또는 인자 없이 호출하면:
 #   - 현재 브랜치가 feature/<x> 면 그것을 대상으로
-#   - 아니면 "내가 author 인 머지된 PR" 후보를 보여주고 선택
+#   - 아니면 로컬 feature/* 후보 목록에서 선택
 ```
 
 ### Release 시나리오
