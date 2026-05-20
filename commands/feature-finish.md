@@ -1,6 +1,6 @@
 ---
 allowed-tools: Bash(git:*), Bash(command:*)
-description: feature 브랜치를 develop 으로 머지하고 로컬/원격에서 삭제 (git flow feature finish 동작)
+description: feature 브랜치를 develop 위로 rebase 후 fast-forward 머지하고 로컬/원격에서 삭제
 argument-hint: "[feature-id]"
 ---
 
@@ -9,10 +9,10 @@ argument-hint: "[feature-id]"
 - `--no-verify`, `--force` 사용 금지.
 - 로컬 브랜치 삭제는 항상 `git branch -d` (소문자) 만 사용. `-D` 로 강제 삭제 금지 — 머지되지 않은 커밋이 남아 있으면 즉시 중단/보고.
 - 머지 기준 브랜치 갱신은 `git pull --ff-only` 만.
-- **머지는 항상 `--no-ff`** — git flow 기본 정책(feature 단위 머지 커밋 보존).
+- **머지는 항상 rebase 후 fast-forward** — 머지 커밋을 만들지 않고 develop 을 선형으로 유지한다.
 - 원격 브랜치가 이미 사라진 경우(GitHub auto-delete 등) `git push origin --delete` 의 실패는 정상으로 간주하고 진행한다.
-- 머지 도중 충돌 발생 시 자동 해결하지 않고 `git merge --abort` 후 원상복구 + 사용자 보고.
-- 본 명령은 `git flow feature finish` 의 동작에 대응한다: develop 으로 머지 → feature 브랜치 로컬/원격 삭제 → develop 으로 복귀.
+- rebase 도중 충돌 발생 시 자동 해결하지 않고 `git rebase --abort` 후 원상복구 + 사용자 보고.
+- 본 명령은 feature 를 develop 위로 rebase 후 fast-forward 머지 → feature 브랜치 로컬/원격 삭제 → develop 으로 복귀한다.
 
 ## 인자
 
@@ -91,32 +91,47 @@ git pull --ff-only origin develop
 
 ff-only 실패 시 즉시 중단 + 보고. develop 이 비-fast-forward 상태면 사용자가 직접 정리 후 재시도해야 한다.
 
-### 4) feature 브랜치를 develop 으로 머지 (--no-ff)
+### 4) feature 를 develop 위로 rebase 후 fast-forward 머지
 
-머지 직전 develop 의 HEAD SHA 를 기록해 둔다 (충돌 시 복구용):
+머지 커밋을 만들지 않고 선형으로 develop 에 얹는다. develop 이 앞서 있어도 rebase 로 feature 를 develop 끝에 올려 fast-forward 가 가능하게 만든다.
+
+#### 4-1) feature 를 develop 위로 rebase
 
 ```bash
-DEVELOP_BEFORE=$(git rev-parse HEAD)
-git merge --no-ff "$TARGET_BRANCH" -m "Merge branch '$TARGET_BRANCH' into develop"
+git checkout "$TARGET_BRANCH"
+git rebase develop
 ```
 
-- 성공 → 5단계 진행.
-- 충돌 발생 → 자동 해결 금지. 다음 순서로 처리:
+- 성공 → 4-2 진행.
+- 충돌 발생 → 자동 해결 금지. 즉시 복구 후 보고:
   ```bash
-  git merge --abort
-  git reset --hard "$DEVELOP_BEFORE"   # 안전 차원의 추가 보호
+  git rebase --abort
   ```
   보고:
   ```
-  ✗ 중단됨: $TARGET_BRANCH → develop 머지 중 충돌 발생
-    git merge --abort 로 develop 을 원래 상태로 복구했습니다.
-    수동으로 rebase 또는 충돌 해결 후 다시 시도해주세요.
+  ✗ 중단됨: $TARGET_BRANCH 를 develop 위로 rebase 중 충돌 발생
+    git rebase --abort 로 원래 상태로 복구했습니다.
+    수동으로 충돌 해결 후 다시 시도해주세요.
 
     참고:
       git checkout $TARGET_BRANCH
       git rebase develop
       # 충돌 해결 후
       /feature-finish $TARGET_BRANCH
+  ```
+
+#### 4-2) develop 으로 fast-forward 머지
+
+```bash
+git checkout develop
+git merge --ff-only "$TARGET_BRANCH"
+```
+
+- 성공 → 5단계 진행.
+- 실패(4-1 rebase 가 성공했다면 이론상 발생하지 않음) → develop 은 변경되지 않은 상태. 보고 후 종료:
+  ```
+  ✗ 중단됨: develop ← $TARGET_BRANCH fast-forward 머지 실패
+    develop 은 변경되지 않았습니다. 상태 확인 후 다시 시도해주세요.
   ```
 
 ### 5) develop push (원격이 있을 때만)
@@ -176,8 +191,9 @@ git fetch --prune origin
 
 성공:
 ```
-✓ feature/<id> finish 완료 (git flow 정책)
-  merge:  develop ← feature/<id>  (--no-ff)
+✓ feature/<id> finish 완료
+  rebase: feature/<id> onto develop
+  merge:  develop ← feature/<id>  (fast-forward, 머지 커밋 없음)
   push:   origin/develop updated
   local:  feature/<id> deleted
   remote: feature/<id> deleted (or already gone)
@@ -187,9 +203,9 @@ git fetch --prune origin
 
 중단(충돌):
 ```
-✗ 중단됨: develop ← feature/<id> 머지 충돌
-  develop 은 머지 전 상태로 복구됨.
-  rebase 후 다시 시도해주세요.
+✗ 중단됨: feature/<id> → develop rebase 충돌
+  rebase --abort 로 원래 상태로 복구됨.
+  충돌 해결 후 다시 시도해주세요.
 ```
 
 중단(미머지 커밋):
@@ -208,6 +224,6 @@ git fetch --prune origin
 
 - `git branch -D` 자동 실행 금지.
 - 원격 강제 푸시 금지 (`--force`, `--force-with-lease`).
-- 머지 충돌 자동 해결 금지.
+- rebase / 머지 충돌 자동 해결 금지.
 - `--no-verify` 사용 금지.
-- `--ff` / fast-forward 머지 금지 (항상 `--no-ff`).
+- `--no-ff` 머지 금지 (항상 rebase 후 fast-forward — 머지 커밋을 만들지 않는다).
